@@ -3,6 +3,7 @@
 
 #include "framework.h"
 #include "TaskBar.h"
+#include "strsafe.h"
 
 #define MAX_LOADSTRING 100
 #define NID_UID 123
@@ -22,6 +23,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 WCHAR szCommandLine[1024] = L"";
 WCHAR szTooltip[512] = L"";
 WCHAR szBalloon[512] = L"";
+WCHAR szPath[4096] = L"";
 WCHAR szEnvironment[1024] = L"";
 volatile DWORD dwChildrenPid;
 
@@ -30,6 +32,7 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+BOOL				mouseInControl(HWND hDlg, HWND hwndCtrl);
 
 static DWORD MyGetProcessId(HANDLE hProcess)
 {
@@ -123,13 +126,16 @@ BOOL DeleteTrayIcon()
 BOOL ShowPopupMenu()
 {
 	POINT pt;
-	BOOL isZHCN = GetSystemDefaultLCID() == 2052;
+	UINT lcid = GetSystemDefaultLCID();
+	BOOL isZHCHS = lcid == 0x0004 || lcid == 0x804 || lcid == 0x1004;
+	BOOL isZHCHT = lcid == 0x0404 || lcid == 0x1404 || lcid == 0x0C04 || lcid == 0x7C04;
 
 	HMENU hMenu = CreatePopupMenu();
-	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_SHOW, (isZHCN ? L"\x663e\x793a" : L"Show"));
-	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_HIDE, (isZHCN ? L"\x9690\x85cf" : L"Hide"));
-	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_RELOAD, (isZHCN ? L"\x91cd\x65b0\x8f7d\x5165" : L"Reload"));
-	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_EXIT, (isZHCN ? L"\x9000\x51fa" : L"Exit"));
+	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_ABOUT, (isZHCHS ? L"关于" : (isZHCHT ? L"關於" : L"About")));
+	//AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_SHOW, (isZHCN ? L"显示" : (isZHCHT? L"顯示" :L"Show")));
+	//AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_HIDE, (isZHCN ? L"隐藏" : (isZHCHT? L"隱藏" :L"Hide")));
+	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_RELOAD, (isZHCHS ? L"重新载入" : (isZHCHT ? L"重新載入" : L"Reload")));
+	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_EXIT, (isZHCHS ? L"退出" : (isZHCHT ? L"退出" : L"Exit")));
 	GetCursorPos(&pt);
 	TrackPopupMenu(hMenu, TPM_LEFTALIGN, pt.x, pt.y, 0, hWnd, NULL);
 	PostMessage(hWnd, WM_NULL, 0, 0);
@@ -139,7 +145,6 @@ BOOL ShowPopupMenu()
 
 BOOL CDCurrentDirectory()
 {
-	WCHAR szPath[4096] = L"";
 	GetModuleFileName(NULL, szPath, sizeof(szPath) / sizeof(szPath[0]) - 1);
 	*wcsrchr(szPath, L'\\') = 0;
 	SetCurrentDirectory(szPath);
@@ -149,7 +154,9 @@ BOOL CDCurrentDirectory()
 
 BOOL SetEenvironment()
 {
-	LoadString(hInst, IDS_CMDLINE, szCommandLine, sizeof(szCommandLine) / sizeof(szCommandLine[0]) - 1);
+	BOOL isZHCN = GetSystemDefaultLCID() == 2052;
+	if (lstrlenW(szCommandLine) == 0)
+		LoadString(hInst, IDS_CMDLINE, szCommandLine, sizeof(szCommandLine) / sizeof(szCommandLine[0]) - 1);
 	LoadString(hInst, IDS_ENVIRONMENT, szEnvironment, sizeof(szEnvironment) / sizeof(szEnvironment[0]) - 1);
 
 	const WCHAR* sep = L"\n";
@@ -169,7 +176,7 @@ BOOL SetEenvironment()
 
 	GetEnvironmentVariableW(L"TASKBAR_TITLE", szTitle, sizeof(szTitle) / sizeof(szTitle[0]) - 1);
 	GetEnvironmentVariableW(L"TASKBAR_TOOLTIP", szTooltip, sizeof(szTooltip) / sizeof(szTooltip[0]) - 1);
-	GetEnvironmentVariableW(L"TASKBAR_BALLOON", szBalloon, sizeof(szBalloon) / sizeof(szBalloon[0]) - 1);
+	GetEnvironmentVariableW(isZHCN ? L"TASKBAR_BALLOON_CN" : L"TASKBAR_BALLOON", szBalloon, sizeof(szBalloon) / sizeof(szBalloon[0]) - 1);
 
 	return TRUE;
 }
@@ -245,7 +252,7 @@ BOOL ExecCmdline()
 	else
 	{
 		wprintf(L"Execute \"%s\" failed!\n", szCommandLine);
-		MessageBox(NULL, L"Error: File 'aria2c.exe' not found.", szCommandLine, MB_OK| MB_ICONERROR);
+		MessageBox(NULL, L"Error: File 'aria2c.exe' not found.", szCommandLine, MB_OK | MB_ICONERROR);
 		ExitProcess(0);
 	}
 	CloseHandle(pi.hThread);
@@ -332,7 +339,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
-
+	StringCchCopyW(szCommandLine, sizeof(szCommandLine) / sizeof(szCommandLine[0]) - 1, lpCmdLine);
 	hInst = hInstance;
 	CDCurrentDirectory();
 	SetEenvironment();
@@ -350,6 +357,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 	CreateConsole();
 	ExecCmdline();
+
+	printf("\nAria2 is starting\n");
 	ShowTrayIcon(NIM_ADD);
 
 	MSG msg;
@@ -403,12 +412,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		// 分析菜单选择:
 		switch (wmId)
 		{
-		case IDM_ABOUT:
-			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-			break;
-			//case IDM_EXIT:
-			//	DestroyWindow(hWnd);
-			//	break;
 		case WM_TASKBARNOTIFY_MENUITEM_SHOW:
 			ShowWindow(hConsole, SW_SHOW);
 			SetForegroundWindow(hConsole);
@@ -420,7 +423,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			ReloadCmdline();
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_ABOUT:
-			MessageBoxW(hWnd, szTooltip, szWindowClass, 0);
+			DialogBoxW(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_EXIT:
 			DeleteTrayIcon();
@@ -455,6 +458,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
+	HWND hwndLink = GetDlgItem(hDlg, IDC_LINK);
+	HBRUSH hBrush = (HBRUSH)GetStockObject(NULL_BRUSH);
+
+	HDC hdcStatic = (HDC)wParam;
+	HWND hwndStatic = (HWND)lParam;
+
 	switch (message)
 	{
 	case WM_INITDIALOG:
@@ -466,7 +475,39 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			EndDialog(hDlg, LOWORD(wParam));
 			return (INT_PTR)TRUE;
 		}
+		if (LOWORD(wParam) == IDC_LINK && HIWORD(wParam) == STN_CLICKED)
+		{
+			ShellExecute(NULL, L"open", L"https://www.aria2e.ga/", NULL, NULL, SW_SHOWNORMAL);
+		}
+		break;
+
+	case WM_CTLCOLORSTATIC:
+		if (hwndStatic == hwndLink)
+		{
+			SetTextColor(hdcStatic, RGB(0, 0, 255));  // 设置字体颜色为蓝色
+			SetBkMode(hdcStatic, TRANSPARENT);       // 设置背景透明
+			return (INT_PTR)hBrush;                           // 返回空画刷
+		}
+		break;
+	case WM_SETCURSOR:
+		if (mouseInControl(hDlg, hwndLink)) {
+			SetCursor(LoadCursorW(NULL, IDC_HAND));
+			SetWindowText(hDlg, L"Click Me");
+		}
+		else {
+			SetCursor(LoadCursorW(NULL, IDC_ARROW));
+			SetWindowText(hDlg, L"About");
+		}
 		break;
 	}
 	return (INT_PTR)FALSE;
+}
+
+BOOL mouseInControl(HWND hDlg, HWND hwndCtrl)
+{
+	POINT pt;
+	RECT rect;
+	GetCursorPos(&pt);  // 获取当前鼠标的屏幕坐标
+	GetWindowRect(hwndCtrl, &rect);  // 获取 hwndCtrl 控件的客户区域
+	return PtInRect(&rect, pt);     // 判断鼠标是否在控件区域内
 }
