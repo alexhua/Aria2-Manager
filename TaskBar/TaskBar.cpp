@@ -477,7 +477,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		if (LOWORD(wParam) == IDC_LINK && HIWORD(wParam) == STN_CLICKED)
 		{
-			ShellExecute(NULL, L"open", L"https://www.aria2e.ga/", NULL, NULL, SW_SHOWNORMAL);
+			ShellExecute(NULL, L"open", L"https://www.aria2e.com/", NULL, NULL, SW_SHOWNORMAL);
 		}
 		break;
 
