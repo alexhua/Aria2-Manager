@@ -2,8 +2,11 @@
 //
 
 #include "framework.h"
-#include "TaskBar.h"
 #include "strsafe.h"
+#include "shlwapi.h"
+#include "TaskBar.h"
+
+#pragma comment(lib, "shlwapi.lib")
 
 #define MAX_LOADSTRING 100
 #define NID_UID 123
@@ -13,6 +16,11 @@
 #define WM_TASKBARNOTIFY_MENUITEM_RELOAD (WM_USER + 23)
 #define WM_TASKBARNOTIFY_MENUITEM_ABOUT (WM_USER + 24)
 #define WM_TASKBARNOTIFY_MENUITEM_EXIT (WM_USER + 25)
+#define WM_TASKBARNOTIFY_MENUITEM_REG (WM_USER + 26)
+#define WM_TASKBARNOTIFY_MENUITEM_UNREG (WM_USER + 27)
+
+const WCHAR* SCHEME_START = L"aria2://start/";
+const WCHAR* SCHEME_BROWSE = L"aria2://browse/path=";
 
 // 全局变量:
 HINSTANCE hInst;                                // 当前实例
@@ -27,12 +35,6 @@ WCHAR szPath[4096] = L"";
 WCHAR szEnvironment[1024] = L"";
 volatile DWORD dwChildrenPid;
 
-// 此代码模块中包含的函数的前向声明:
-ATOM                MyRegisterClass(HINSTANCE hInstance);
-BOOL                InitInstance(HINSTANCE, int);
-LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
-BOOL				mouseInControl(HWND hDlg, HWND hwndCtrl);
 
 static DWORD MyGetProcessId(HANDLE hProcess)
 {
@@ -126,14 +128,30 @@ BOOL DeleteTrayIcon()
 BOOL ShowPopupMenu()
 {
 	POINT pt;
+	HKEY hKey;
 	UINT lcid = GetSystemDefaultLCID();
 	BOOL isZHCHS = lcid == 0x0004 || lcid == 0x804 || lcid == 0x1004;
 	BOOL isZHCHT = lcid == 0x0404 || lcid == 0x1404 || lcid == 0x0C04 || lcid == 0x7C04;
 
 	HMENU hMenu = CreatePopupMenu();
 	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_ABOUT, (isZHCHS ? L"关于" : (isZHCHT ? L"關於" : L"About")));
-	//AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_SHOW, (isZHCN ? L"显示" : (isZHCHT? L"顯示" :L"Show")));
-	//AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_HIDE, (isZHCN ? L"隐藏" : (isZHCHT? L"隱藏" :L"Hide")));
+	if (!IsWindowVisible(hConsole))
+	{
+		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_SHOW, (isZHCHS ? L"显示" : (isZHCHT ? L"顯示" : L"Show")));
+	}
+	else
+	{
+		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_HIDE, (isZHCHS ? L"隐藏" : (isZHCHT ? L"隱藏" : L"Hide")));
+	}
+	if (RegOpenKeyEx(HKEY_CLASSES_ROOT, L"aria2", 0, KEY_READ, &hKey) != ERROR_SUCCESS)
+	{
+		RegCloseKey(hKey);
+		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_REG, (isZHCHS ? L"注册" : (isZHCHT ? L"注冊" : L"Register")));
+	}
+	else
+	{
+		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_UNREG, (isZHCHS ? L"注销" : (isZHCHT ? L"注銷" : L"UnRegister")));
+	}
 	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_RELOAD, (isZHCHS ? L"重新载入" : (isZHCHT ? L"重新載入" : L"Reload")));
 	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_EXIT, (isZHCHS ? L"退出" : (isZHCHT ? L"退出" : L"Exit")));
 	GetCursorPos(&pt);
@@ -339,7 +357,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
-	StringCchCopyW(szCommandLine, sizeof(szCommandLine) / sizeof(szCommandLine[0]) - 1, lpCmdLine);
+	//StringCchCopyW(szCommandLine, sizeof(szCommandLine) / sizeof(szCommandLine[0]) - 1, lpCmdLine);
 	hInst = hInstance;
 	CDCurrentDirectory();
 	SetEenvironment();
@@ -349,6 +367,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	LoadStringW(hInstance, IDC_TASKBAR, szWindowClass, MAX_LOADSTRING);
 	MyRegisterClass(hInstance);
 
+	// Process URL scheme	
+	if (wcsstr(lpCmdLine, SCHEME_BROWSE) == lpCmdLine) // lpCmdLine starts with SCHEME_BROWSE
+	{
+		WCHAR path[1024];
+		StringCchCopyW(path, 1023, lpCmdLine + lstrlen(SCHEME_BROWSE));
+		UrlUnescapeW(path, NULL, NULL, URL_UNESCAPE_INPLACE | URL_UNESCAPE_AS_UTF8);
+		if (wcsstr(path, L".exe") == 0 && wcsstr(path, L".bat") == 0 && wcsstr(path, L".cmd") == 0 && wcsstr(path, L".vbs") == 0) {
+			ShellExecute(NULL, L"open", path, NULL, NULL, SW_SHOWNORMAL);
+		}
+		exit(0);
+	}
+	else if (lstrlen(lpCmdLine) != 0 && lstrcmp(lpCmdLine, SCHEME_START) != 0)
+	{
+		exit(0);
+	}
+
 	// 执行应用程序初始化:
 	if (!InitInstance(hInstance, SW_HIDE))
 	{
@@ -357,8 +391,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 	CreateConsole();
 	ExecCmdline();
-
-	printf("\nAria2 is starting\n");
+	printf("Aria2 is starting\n");
 	ShowTrayIcon(NIM_ADD);
 
 	MSG msg;
@@ -418,6 +451,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_HIDE:
 			ShowWindow(hConsole, SW_HIDE);
+			break;
+		case WM_TASKBARNOTIFY_MENUITEM_REG:
+			if (RegUrlScheme())
+			{
+				MessageBox(nullptr, L"Register Aria2 to system successfully!", L"Success", MB_OK | MB_ICONINFORMATION);
+			}
+			else
+			{
+				MessageBox(nullptr, L"Register Aria2 to system failed, please run as administrator!", L"Failure", MB_OK | MB_ICONERROR);
+			}
+			break;
+		case WM_TASKBARNOTIFY_MENUITEM_UNREG:
+			if (UnRegUrlScheme())
+			{
+				MessageBox(nullptr, L"Unregister Aria2 from system successfully!", L"Success", MB_OK | MB_ICONINFORMATION);
+			}
+			else
+			{
+				MessageBox(nullptr, L"Unregister Aria2 from system failed, please run as administrator!", L"Failure", MB_OK | MB_ICONERROR);
+			}
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_RELOAD:
 			ReloadCmdline();
@@ -510,4 +563,70 @@ BOOL mouseInControl(HWND hDlg, HWND hwndCtrl)
 	GetCursorPos(&pt);  // 获取当前鼠标的屏幕坐标
 	GetWindowRect(hwndCtrl, &rect);  // 获取 hwndCtrl 控件的客户区域
 	return PtInRect(&rect, pt);     // 判断鼠标是否在控件区域内
+}
+
+BOOL RegUrlScheme()
+{
+	HKEY hKey = nullptr;
+	LSTATUS result;
+
+	// 创建或打开 HKEY_CLASSES_ROOT\aria2 URL 键
+	result = RegCreateKeyExW(HKEY_CLASSES_ROOT, L"aria2", 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+	if (result != ERROR_SUCCESS)
+	{
+		// 错误处理
+		return false;
+	}
+
+	// 设置默认值为 "URL:aria2 Protocol"
+	result = RegSetValueExW(hKey, nullptr, 0, REG_SZ, reinterpret_cast<const BYTE*>(L"URL:Aria2 Protocol"), (wcslen(L"URL:Aria2 Protocol") + 1) * sizeof(WCHAR));
+	if (result != ERROR_SUCCESS)
+	{
+		// 错误处理
+		RegCloseKey(hKey);
+		return false;
+	}
+
+	// 创建"URL Protocol"字符串
+	result = RegSetValueExW(hKey, L"URL Protocol", 0, REG_SZ, 0, 0);
+	if (result != ERROR_SUCCESS)
+	{
+		// 错误处理
+		RegCloseKey(hKey);
+		return false;
+	}
+
+	// 创建或打开 HKEY_CLASSES_ROOT\aria2\shell\open\command 键
+	HKEY hKeyCommand = nullptr;
+	result = RegCreateKeyExW(hKey, L"shell\\open\\command", 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKeyCommand, nullptr);
+	if (result != ERROR_SUCCESS)
+	{
+		// 错误处理
+		RegCloseKey(hKey);
+		return false;
+	}
+
+	// 设置Command值
+	WCHAR command[1024] = L"";
+	GetModuleFileName(NULL, command, sizeof(command) / sizeof(command[0]) - 1);
+	StringCchCatW(command, sizeof(command) / sizeof(command[0]) - 1, L" %1");
+	result = RegSetValueExW(hKeyCommand, nullptr, 0, REG_SZ, reinterpret_cast<const BYTE*>(command), (lstrlen(command) + 1) * sizeof(WCHAR));
+	if (result != ERROR_SUCCESS)
+	{
+		// 错误处理
+		RegCloseKey(hKeyCommand);
+		RegCloseKey(hKey);
+		return false;
+	}
+
+	// 关闭键
+	RegCloseKey(hKeyCommand);
+	RegCloseKey(hKey);
+
+	return true;
+}
+
+BOOL UnRegUrlScheme()
+{
+	return RegDeleteTree(HKEY_CLASSES_ROOT, L"aria2") == ERROR_SUCCESS;
 }

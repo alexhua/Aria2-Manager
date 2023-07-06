@@ -5,7 +5,6 @@
 #define IDD_TASKBAR_DIALOG              102
 #define IDS_APP_TITLE                   103
 #define IDD_ABOUTBOX                    104
-#define Version                         104
 #define IDM_ABOUT                       105
 #define IDS_CMDLINE                     106
 #define IDS_ENVIRONMENT                 107
@@ -17,7 +16,7 @@
 #define IDI_ICON                        1000
 #define IDC_LINK                        1001
 #define IDC_STATIC2                     1002
-#define IDC_STATIC                      -1
+#define IDC_STATIC                      1003
 
 // Next default values for new objects
 // 
