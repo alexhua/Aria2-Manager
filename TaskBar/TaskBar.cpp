@@ -4,6 +4,7 @@
 #include "framework.h"
 #include "strsafe.h"
 #include "shlwapi.h"
+#include "shlobj.h"
 #include "TaskBar.h"
 
 #pragma comment(lib, "shlwapi.lib")
@@ -367,14 +368,25 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	LoadStringW(hInstance, IDC_TASKBAR, szWindowClass, MAX_LOADSTRING);
 	MyRegisterClass(hInstance);
 
-	// Process URL scheme	
+	// Process URL scheme
 	if (wcsstr(lpCmdLine, SCHEME_BROWSE) == lpCmdLine) // lpCmdLine starts with SCHEME_BROWSE
 	{
-		WCHAR path[1024];
-		StringCchCopyW(path, 1023, lpCmdLine + lstrlen(SCHEME_BROWSE));
+		WCHAR path[MAX_PATH];
+		StringCchCopyW(path, MAX_PATH, lpCmdLine + lstrlen(SCHEME_BROWSE));
 		UrlUnescapeW(path, NULL, NULL, URL_UNESCAPE_INPLACE | URL_UNESCAPE_AS_UTF8);
-		if (wcsstr(path, L".exe") == 0 && wcsstr(path, L".bat") == 0 && wcsstr(path, L".cmd") == 0 && wcsstr(path, L".vbs") == 0) {
+		if (PathIsDirectoryW(path))
+		{
 			ShellExecute(NULL, L"open", path, NULL, NULL, SW_SHOWNORMAL);
+		}
+		else
+		{
+			HRESULT hr = CoInitialize(NULL);
+			PIDLIST_ABSOLUTE pidl = ILCreateFromPathW(path);
+			if (SUCCEEDED(hr) && pidl)
+			{
+				SHOpenFolderAndSelectItems(pidl, 0, NULL, 0);
+				ILFree(pidl);
+			}
 		}
 		exit(0);
 	}
