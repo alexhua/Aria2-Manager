@@ -14,6 +14,9 @@ Aria2 Manager is a useful tool that allows user to run [Aria2](https://github.co
 
 ![Aria2 Manager](./Screenshot/aria2manager.png)
 
+## Install 
+
+[<img src="https://get.microsoft.com/images/en-us%20dark.svg" height="56"/>](https://apps.microsoft.com/detail/Aria2%20Manager/9P5WQ68Q20WV?launch=true)
 
 ## Reference 
 
