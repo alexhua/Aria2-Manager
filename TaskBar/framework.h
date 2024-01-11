@@ -9,6 +9,9 @@
 // Windows 头文件
 #include <windows.h>
 #include <psapi.h>
+#include "strsafe.h"
+#include "shlwapi.h"
+#include "shlobj.h"
 // C 运行时头文件
 #include <stdlib.h>
 #include <malloc.h>
@@ -18,4 +21,4 @@
 #include <shellapi.h>
 #include <stdio.h>
 #include <io.h>
-
+#include <fstream>

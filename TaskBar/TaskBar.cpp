@@ -2,15 +2,11 @@
 //
 
 #include "framework.h"
-#include "strsafe.h"
-#include "shlwapi.h"
-#include "shlobj.h"
 #include "TaskBar.h"
+#include "Log.h"
 
 #pragma comment(lib, "shlwapi.lib")
 
-#define MAX_LOADSTRING 100
-#define NID_UID 123
 #define WM_TASKBARNOTIFY WM_USER+20
 #define WM_TASKBARNOTIFY_MENUITEM_SHOW (WM_USER + 21)
 #define WM_TASKBARNOTIFY_MENUITEM_HIDE (WM_USER + 22)
@@ -19,9 +15,15 @@
 #define WM_TASKBARNOTIFY_MENUITEM_EXIT (WM_USER + 25)
 #define WM_TASKBARNOTIFY_MENUITEM_REG (WM_USER + 26)
 #define WM_TASKBARNOTIFY_MENUITEM_UNREG (WM_USER + 27)
+#define WM_TASKBARNOTIFY_MENUITEM_AUTORUN (WM_USER + 28)
 
+constexpr auto NID_UID = 123;
+constexpr auto MAX_LOADSTRING = 100;
+
+const WCHAR* APP_NAME = L"Aria2 Manager";
 const WCHAR* SCHEME_START = L"aria2://start/";
 const WCHAR* SCHEME_BROWSE = L"aria2://browse/path=";
+
 
 // 全局变量:
 HINSTANCE hInst;                                // 当前实例
@@ -32,7 +34,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 WCHAR szCommandLine[1024] = L"";
 WCHAR szTooltip[512] = L"";
 WCHAR szBalloon[512] = L"";
-WCHAR szPath[4096] = L"";
+WCHAR szFullPath[MAX_PATH] = L"";
 WCHAR szEnvironment[1024] = L"";
 volatile DWORD dwChildrenPid;
 
@@ -96,7 +98,7 @@ static BOOL MyEndTask(DWORD pid)
 	return TRUE;
 }
 
-BOOL ShowTrayIcon(DWORD dwMessage)
+static BOOL ShowTrayIcon(DWORD dwMessage)
 {
 	NOTIFYICONDATA nid;
 	ZeroMemory(&nid, sizeof(NOTIFYICONDATA));
@@ -116,7 +118,7 @@ BOOL ShowTrayIcon(DWORD dwMessage)
 	return TRUE;
 }
 
-BOOL DeleteTrayIcon()
+static BOOL DeleteTrayIcon()
 {
 	NOTIFYICONDATA nid;
 	nid.cbSize = (DWORD)sizeof(NOTIFYICONDATA);
@@ -126,13 +128,13 @@ BOOL DeleteTrayIcon()
 	return TRUE;
 }
 
-BOOL ShowPopupMenu()
+static BOOL ShowPopupMenu()
 {
 	POINT pt;
-	HKEY hKey;
 	UINT lcid = GetSystemDefaultLCID();
 	BOOL isZHCHS = lcid == 0x0004 || lcid == 0x804 || lcid == 0x1004;
 	BOOL isZHCHT = lcid == 0x0404 || lcid == 0x1404 || lcid == 0x0C04 || lcid == 0x7C04;
+	BOOL isAutoStart = isAutoStartupSet(APP_NAME);
 
 	HMENU hMenu = CreatePopupMenu();
 	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_ABOUT, (isZHCHS ? L"关于" : (isZHCHT ? L"關於" : L"About")));
@@ -144,15 +146,15 @@ BOOL ShowPopupMenu()
 	{
 		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_HIDE, (isZHCHS ? L"隐藏" : (isZHCHT ? L"隱藏" : L"Hide")));
 	}
-	if (RegOpenKeyEx(HKEY_CLASSES_ROOT, L"aria2", 0, KEY_READ, &hKey) != ERROR_SUCCESS)
+	if (!isUrlSchemeReged())
 	{
-		RegCloseKey(hKey);
 		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_REG, (isZHCHS ? L"注册" : (isZHCHT ? L"注冊" : L"Register")));
 	}
 	else
 	{
 		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_UNREG, (isZHCHS ? L"注销" : (isZHCHT ? L"注銷" : L"UnRegister")));
 	}
+	AppendMenu(hMenu, isAutoStart * MF_CHECKED, WM_TASKBARNOTIFY_MENUITEM_AUTORUN, (isZHCHS ? L"开机启动" : (isZHCHT ? L"開啓啓動" : L"Start on Boot")));
 	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_RELOAD, (isZHCHS ? L"重新载入" : (isZHCHT ? L"重新載入" : L"Reload")));
 	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_EXIT, (isZHCHS ? L"退出" : (isZHCHT ? L"退出" : L"Exit")));
 	GetCursorPos(&pt);
@@ -162,16 +164,26 @@ BOOL ShowPopupMenu()
 	return TRUE;
 }
 
-BOOL CDCurrentDirectory()
+static BOOL CDCurrentDirectory()
 {
-	GetModuleFileName(NULL, szPath, sizeof(szPath) / sizeof(szPath[0]) - 1);
-	*wcsrchr(szPath, L'\\') = 0;
-	SetCurrentDirectory(szPath);
-	SetEnvironmentVariableW(L"CWD", szPath);
-	return TRUE;
+	GetModuleFileName(NULL, szFullPath, MAX_PATH);
+	wchar_t* lastBackslash = wcsrchr(szFullPath, L'\\');
+	if (lastBackslash != NULL)
+	{
+		*lastBackslash = L'\0';
+		SetCurrentDirectory(szFullPath);
+		SetEnvironmentVariableW(L"CWD", szFullPath);
+		*lastBackslash = L'\\';
+		return true;
+	}
+	else
+	{
+		Log::Error(L"Failed to set Current Directory.");
+	}
+	return false;
 }
 
-BOOL SetEenvironment()
+static BOOL SetEenvironment()
 {
 	BOOL isZHCN = GetSystemDefaultLCID() == 2052;
 	if (lstrlenW(szCommandLine) == 0)
@@ -200,7 +212,7 @@ BOOL SetEenvironment()
 	return TRUE;
 }
 
-BOOL WINAPI ConsoleHandler(DWORD CEvent)
+static BOOL WINAPI ConsoleHandler(DWORD CEvent)
 {
 	switch (CEvent)
 	{
@@ -213,7 +225,7 @@ BOOL WINAPI ConsoleHandler(DWORD CEvent)
 	return TRUE;
 }
 
-BOOL CreateConsole()
+static BOOL CreateConsole()
 {
 	WCHAR szVisible[BUFSIZ] = L"";
 
@@ -235,7 +247,7 @@ BOOL CreateConsole()
 
 	if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)ConsoleHandler, TRUE) == FALSE)
 	{
-		printf("Unable to install handler!\n");
+		Log::Error(L"Unable to install handler!\n");
 		return FALSE;
 	}
 
@@ -248,9 +260,16 @@ BOOL CreateConsole()
 			size.Y = 2048;
 			if (!SetConsoleScreenBufferSize(GetStdHandle(STD_ERROR_HANDLE), size))
 			{
-				printf("Unable to set console screen buffer size!\n");
+				Log::Error(L"Unable to set console screen buffer size!\n");
 			}
 		}
+	}
+
+	HANDLE hStdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+	DWORD dwMode = 0;
+	if (hStdHandle != INVALID_HANDLE_VALUE && GetConsoleMode(hStdHandle, &dwMode)) {
+		dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+		SetConsoleMode(hStdHandle, dwMode);
 	}
 
 	return TRUE;
@@ -270,7 +289,7 @@ BOOL ExecCmdline()
 	}
 	else
 	{
-		wprintf(L"Execute \"%s\" failed!\n", szCommandLine);
+		Log::Error(L"Execute \"%s\" failed!\n", szCommandLine);
 		MessageBox(NULL, L"Error: File 'aria2c.exe' not found.", szCommandLine, MB_OK | MB_ICONERROR);
 		ExitProcess(0);
 	}
@@ -279,7 +298,7 @@ BOOL ExecCmdline()
 	return TRUE;
 }
 
-BOOL ReloadCmdline()
+static BOOL ReloadCmdline()
 {
 	//HANDLE hProcess = OpenProcess(SYNCHRONIZE|PROCESS_TERMINATE, FALSE, dwChildrenPid);
 	//if (hProcess)
@@ -403,7 +422,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 	CreateConsole();
 	ExecCmdline();
-	printf("Aria2 is starting\n");
+	Log::Info(L"Aria2 is starting...\n");
 	ShowTrayIcon(NIM_ADD);
 
 	MSG msg;
@@ -482,6 +501,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			else
 			{
 				MessageBox(nullptr, L"Unregister Aria2 from system failed, please run as administrator!", L"Failure", MB_OK | MB_ICONERROR);
+			}
+			break;
+		case WM_TASKBARNOTIFY_MENUITEM_AUTORUN:
+			if (isAutoStartupSet(APP_NAME))
+			{
+				disableAutoStartup(APP_NAME);
+			}
+			else
+			{
+				enableAutoStartup(APP_NAME);
 			}
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_RELOAD:
@@ -580,19 +609,24 @@ BOOL mouseInControl(HWND hDlg, HWND hwndCtrl)
 BOOL RegUrlScheme()
 {
 	HKEY hKey = nullptr;
-	LSTATUS result;
+	LSTATUS status;
+	BOOL result = false;
 
-	// 创建或打开 HKEY_CLASSES_ROOT\aria2 URL 键
-	result = RegCreateKeyExW(HKEY_CLASSES_ROOT, L"aria2", 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
-	if (result != ERROR_SUCCESS)
+	// 创建或打开 HKEY_CLASSES_ROOT\aria2 键，失败则创建HKEY_CURRENT_USER\Software\Classes\aria2
+	status = RegCreateKeyExW(HKEY_CLASSES_ROOT, L"aria2", 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+	if (status != ERROR_SUCCESS)
+	{
+		status = RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Classes\\aria2", 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+	}
+	if (status != ERROR_SUCCESS)
 	{
 		// 错误处理
 		return false;
 	}
 
 	// 设置默认值为 "URL:aria2 Protocol"
-	result = RegSetValueExW(hKey, nullptr, 0, REG_SZ, reinterpret_cast<const BYTE*>(L"URL:Aria2 Protocol"), (wcslen(L"URL:Aria2 Protocol") + 1) * sizeof(WCHAR));
-	if (result != ERROR_SUCCESS)
+	status = RegSetValueExW(hKey, nullptr, 0, REG_SZ, reinterpret_cast<const BYTE*>(L"URL:Aria2 Protocol"), (wcslen(L"URL:Aria2 Protocol") + 1) * sizeof(WCHAR));
+	if (status != ERROR_SUCCESS)
 	{
 		// 错误处理
 		RegCloseKey(hKey);
@@ -600,18 +634,18 @@ BOOL RegUrlScheme()
 	}
 
 	// 创建"URL Protocol"字符串
-	result = RegSetValueExW(hKey, L"URL Protocol", 0, REG_SZ, 0, 0);
-	if (result != ERROR_SUCCESS)
+	status = RegSetValueExW(hKey, L"URL Protocol", 0, REG_SZ, 0, 0);
+	if (status != ERROR_SUCCESS)
 	{
 		// 错误处理
 		RegCloseKey(hKey);
 		return false;
 	}
 
-	// 创建或打开 HKEY_CLASSES_ROOT\aria2\shell\open\command 键
+	// 创建或打开 .\aria2\shell\open\command 键
 	HKEY hKeyCommand = nullptr;
-	result = RegCreateKeyExW(hKey, L"shell\\open\\command", 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKeyCommand, nullptr);
-	if (result != ERROR_SUCCESS)
+	status = RegCreateKeyExW(hKey, L"shell\\open\\command", 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKeyCommand, nullptr);
+	if (status != ERROR_SUCCESS)
 	{
 		// 错误处理
 		RegCloseKey(hKey);
@@ -619,11 +653,11 @@ BOOL RegUrlScheme()
 	}
 
 	// 设置Command值
-	WCHAR command[1024] = L"";
+	WCHAR command[MAX_PATH] = L"";
 	GetModuleFileName(NULL, command, sizeof(command) / sizeof(command[0]) - 1);
 	StringCchCatW(command, sizeof(command) / sizeof(command[0]) - 1, L" %1");
-	result = RegSetValueExW(hKeyCommand, nullptr, 0, REG_SZ, reinterpret_cast<const BYTE*>(command), (lstrlen(command) + 1) * sizeof(WCHAR));
-	if (result != ERROR_SUCCESS)
+	status = RegSetValueExW(hKeyCommand, nullptr, 0, REG_SZ, reinterpret_cast<const BYTE*>(command), (lstrlen(command) + 1) * sizeof(WCHAR));
+	if (status != ERROR_SUCCESS)
 	{
 		// 错误处理
 		RegCloseKey(hKeyCommand);
@@ -640,5 +674,143 @@ BOOL RegUrlScheme()
 
 BOOL UnRegUrlScheme()
 {
-	return RegDeleteTree(HKEY_CLASSES_ROOT, L"aria2") == ERROR_SUCCESS;
+	BOOL result = RegDeleteTree(HKEY_CLASSES_ROOT, L"aria2") == ERROR_SUCCESS;
+	if (!result)
+	{
+		result = RegDeleteTree(HKEY_CURRENT_USER, L"Software\\Classes\\aria2") == ERROR_SUCCESS;
+	}
+
+	return result;
+}
+
+BOOL isUrlSchemeReged()
+{
+	HKEY hKey;
+	BOOL result = false;
+	LSTATUS status = RegOpenKeyEx(HKEY_CLASSES_ROOT, L"aria2\\shell\\open\\command", 0, KEY_READ, &hKey);
+	if (status != ERROR_SUCCESS)
+	{
+		status = RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Classes\\aria2\\shell\\open\\command", 0, KEY_READ, &hKey);
+	}
+	if (status == ERROR_SUCCESS)
+	{
+		DWORD dataSize = 0;
+		status = RegQueryValueExW(hKey, NULL, NULL, NULL, NULL, &dataSize);
+		if (status == ERROR_SUCCESS) {
+			wchar_t* valueData = new wchar_t[dataSize / sizeof(wchar_t)];
+			status = RegQueryValueEx(hKey, NULL, NULL, NULL, (BYTE*)valueData, &dataSize);
+			if (status == ERROR_SUCCESS) {
+				WCHAR command[MAX_PATH] = L"";
+				GetModuleFileName(NULL, command, sizeof(command) / sizeof(command[0]) - 1);
+				StringCchCatW(command, sizeof(command) / sizeof(command[0]) - 1, L" %1");
+				result = wcscmp(valueData, command) == 0;
+			}
+			delete[] valueData;
+		}
+		RegCloseKey(hKey);
+	}
+	return result;
+}
+
+BOOL enableAutoStartup(const wchar_t* appName)
+{
+	HKEY hKey;
+	BOOL success = false;
+
+	LSTATUS status = RegOpenKeyEx(
+		HKEY_CURRENT_USER,
+		L"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+		0,
+		KEY_SET_VALUE,
+		&hKey
+	);
+	if (status == ERROR_SUCCESS) {
+		status = RegSetValueEx(
+			hKey,
+			appName,
+			0,
+			REG_SZ,
+			(BYTE*)szFullPath,
+			(wcslen(szFullPath) + 1) * sizeof(wchar_t)
+		);
+
+		if (status == ERROR_SUCCESS) {
+			Log::Info(L"Start-on-Boot is enabled.\n");
+			success = true;
+		}
+		else {
+			Log::Error(L"Failed to enable Start-on-Boot.\n");
+		}
+
+		RegCloseKey(hKey);
+	}
+	else {
+		Log::Error(L"Failed to open Registry.");
+	}
+	return success;
+}
+
+BOOL disableAutoStartup(const wchar_t* appName)
+{
+	HKEY hKey;
+	BOOL success = false;
+
+	LSTATUS status = RegOpenKeyEx(
+		HKEY_CURRENT_USER,
+		L"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+		0,
+		KEY_SET_VALUE,
+		&hKey
+	);
+
+	if (status == ERROR_SUCCESS) {
+		status = RegDeleteValue(hKey, appName);
+
+		if (status == ERROR_SUCCESS) {
+			Log::Info(L"Start-on-Boot is disabled.\n");
+			success = true;
+		}
+		else {
+			Log::Error(L"Failed to disable Start-on-Boot.\n");
+		}
+
+		RegCloseKey(hKey);
+	}
+	else {
+		Log::Error(L"Failed to open Registry.");
+	}
+	return success;
+}
+
+BOOL isAutoStartupSet(const wchar_t* appName) {
+	BOOL result = false;
+	HKEY hKey;
+
+	LSTATUS status = RegOpenKeyEx(
+		HKEY_CURRENT_USER,
+		L"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+		0,
+		KEY_QUERY_VALUE,
+		&hKey
+	);
+
+	if (status == ERROR_SUCCESS) {
+		DWORD dataSize = 0;
+		status = RegQueryValueExW(hKey, appName, NULL, NULL, NULL, &dataSize);
+		if (status == ERROR_SUCCESS) {
+			wchar_t* valueData = new wchar_t[dataSize / sizeof(wchar_t)];
+
+			status = RegQueryValueEx(hKey, appName, NULL, NULL, (BYTE*)valueData, &dataSize);
+
+			if (status == ERROR_SUCCESS) {
+				result = wcscmp(valueData, szFullPath) == 0;
+			}
+			else {
+				Log::Error(L"Failed to get the auto-run data from registry\n");
+			}
+			delete[] valueData;
+			RegCloseKey(hKey);
+		}
+	}
+	return result;
 }

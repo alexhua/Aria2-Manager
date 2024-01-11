@@ -10,3 +10,7 @@ INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 BOOL				mouseInControl(HWND hDlg, HWND hwndCtrl);
 BOOL				RegUrlScheme();
 BOOL				UnRegUrlScheme();
+BOOL				isUrlSchemeReged();
+BOOL				enableAutoStartup(const wchar_t*);
+BOOL				disableAutoStartup(const wchar_t*);
+BOOL				isAutoStartupSet(const wchar_t*);
