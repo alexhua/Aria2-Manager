@@ -39,8 +39,7 @@ WCHAR szEnvironment[1024] = L"";
 volatile DWORD dwChildrenPid;
 
 
-static DWORD MyGetProcessId(HANDLE hProcess)
-{
+static DWORD MyGetProcessId(HANDLE hProcess) {
 	// https://gist.github.com/kusma/268888
 	typedef DWORD(WINAPI* pfnGPI)(HANDLE);
 	typedef ULONG(WINAPI* pfnNTQIP)(HANDLE, ULONG, PVOID, ULONG, PULONG);
@@ -48,8 +47,7 @@ static DWORD MyGetProcessId(HANDLE hProcess)
 	static int first = 1;
 	static pfnGPI pfnGetProcessId;
 	static pfnNTQIP ZwQueryInformationProcess;
-	if (first)
-	{
+	if (first) {
 		first = 0;
 		pfnGetProcessId = (pfnGPI)GetProcAddress(
 			GetModuleHandleW(L"KERNEL32.DLL"), "GetProcessId");
@@ -60,8 +58,7 @@ static DWORD MyGetProcessId(HANDLE hProcess)
 	}
 	if (pfnGetProcessId)
 		return pfnGetProcessId(hProcess);
-	if (ZwQueryInformationProcess)
-	{
+	if (ZwQueryInformationProcess) {
 		struct
 		{
 			PVOID Reserved1;
@@ -77,8 +74,7 @@ static DWORD MyGetProcessId(HANDLE hProcess)
 }
 
 
-static BOOL MyEndTask(DWORD pid)
-{
+static BOOL MyEndTask(DWORD pid) {
 	DWORD DELAYTIME = 2000;
 	HANDLE hPrc;
 
@@ -86,20 +82,20 @@ static BOOL MyEndTask(DWORD pid)
 
 	hPrc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);  // Opens handle to the process.  
 
-	if (!TerminateProcess(hPrc, 0)) // Terminates a process.  
-	{
+	if (!TerminateProcess(hPrc, 0)) { // Terminates a process.  
+
 		CloseHandle(hPrc);
 		return FALSE;
 	}
-	else
+	else {
 		WaitForSingleObject(hPrc, DELAYTIME); // At most ,wait 2000  millisecond.  
+	}
 
 	CloseHandle(hPrc);
 	return TRUE;
 }
 
-static BOOL ShowTrayIcon(DWORD dwMessage)
-{
+static BOOL ShowTrayIcon(DWORD dwMessage) {
 	NOTIFYICONDATA nid;
 	ZeroMemory(&nid, sizeof(NOTIFYICONDATA));
 	nid.cbSize = (DWORD)sizeof(NOTIFYICONDATA);
@@ -118,8 +114,7 @@ static BOOL ShowTrayIcon(DWORD dwMessage)
 	return TRUE;
 }
 
-static BOOL DeleteTrayIcon()
-{
+static BOOL DeleteTrayIcon() {
 	NOTIFYICONDATA nid;
 	nid.cbSize = (DWORD)sizeof(NOTIFYICONDATA);
 	nid.hWnd = hWnd;
@@ -128,8 +123,7 @@ static BOOL DeleteTrayIcon()
 	return TRUE;
 }
 
-static BOOL ShowPopupMenu()
-{
+static BOOL ShowPopupMenu() {
 	POINT pt;
 	UINT lcid = GetSystemDefaultLCID();
 	BOOL isZHCHS = lcid == 0x0004 || lcid == 0x804 || lcid == 0x1004;
@@ -138,20 +132,16 @@ static BOOL ShowPopupMenu()
 
 	HMENU hMenu = CreatePopupMenu();
 	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_ABOUT, (isZHCHS ? L"关于" : (isZHCHT ? L"關於" : L"About")));
-	if (!IsWindowVisible(hConsole))
-	{
+	if (!IsWindowVisible(hConsole)) {
 		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_SHOW, (isZHCHS ? L"显示" : (isZHCHT ? L"顯示" : L"Show")));
 	}
-	else
-	{
+	else {
 		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_HIDE, (isZHCHS ? L"隐藏" : (isZHCHT ? L"隱藏" : L"Hide")));
 	}
-	if (!isUrlSchemeReged())
-	{
+	if (!isUrlSchemeReged()) {
 		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_REG, (isZHCHS ? L"注册" : (isZHCHT ? L"注冊" : L"Register")));
 	}
-	else
-	{
+	else {
 		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_UNREG, (isZHCHS ? L"注销" : (isZHCHT ? L"注銷" : L"UnRegister")));
 	}
 	AppendMenu(hMenu, isAutoStart * MF_CHECKED, WM_TASKBARNOTIFY_MENUITEM_AUTORUN, (isZHCHS ? L"开机启动" : (isZHCHT ? L"開啓啓動" : L"Start on Boot")));
@@ -164,27 +154,23 @@ static BOOL ShowPopupMenu()
 	return TRUE;
 }
 
-static BOOL CDCurrentDirectory()
-{
+static BOOL CDCurrentDirectory() {
 	GetModuleFileName(NULL, szFullPath, MAX_PATH);
 	wchar_t* lastBackslash = wcsrchr(szFullPath, L'\\');
-	if (lastBackslash != NULL)
-	{
+	if (lastBackslash != NULL) {
 		*lastBackslash = L'\0';
 		SetCurrentDirectory(szFullPath);
 		SetEnvironmentVariableW(L"CWD", szFullPath);
 		*lastBackslash = L'\\';
 		return true;
 	}
-	else
-	{
+	else {
 		Log::Error(L"Failed to set Current Directory.");
 	}
 	return false;
 }
 
-static BOOL SetEenvironment()
-{
+static BOOL SetEenvironment() {
 	BOOL isZHCN = GetSystemDefaultLCID() == 2052;
 	if (lstrlenW(szCommandLine) == 0)
 		LoadString(hInst, IDS_CMDLINE, szCommandLine, sizeof(szCommandLine) / sizeof(szCommandLine[0]) - 1);
@@ -194,10 +180,8 @@ static BOOL SetEenvironment()
 	WCHAR* pos = NULL;
 	WCHAR* context = NULL;
 	WCHAR* token = wcstok_s(szEnvironment, sep, &context);
-	while (token != NULL)
-	{
-		if ((pos = wcschr(token, L'=')) != NULL)
-		{
+	while (token != NULL) {
+		if ((pos = wcschr(token, L'=')) != NULL) {
 			*pos = 0;
 			SetEnvironmentVariableW(token, pos + 1);
 			//wprintf(L"[%s] = [%s]\n", token, pos+1);
@@ -212,10 +196,8 @@ static BOOL SetEenvironment()
 	return TRUE;
 }
 
-static BOOL WINAPI ConsoleHandler(DWORD CEvent)
-{
-	switch (CEvent)
-	{
+static BOOL WINAPI ConsoleHandler(DWORD CEvent) {
+	switch (CEvent) {
 	case CTRL_LOGOFF_EVENT:
 	case CTRL_SHUTDOWN_EVENT:
 	case CTRL_CLOSE_EVENT:
@@ -225,8 +207,7 @@ static BOOL WINAPI ConsoleHandler(DWORD CEvent)
 	return TRUE;
 }
 
-static BOOL CreateConsole()
-{
+static BOOL CreateConsole() {
 	WCHAR szVisible[BUFSIZ] = L"";
 
 	AllocConsole();
@@ -236,30 +217,24 @@ static BOOL CreateConsole()
 
 	hConsole = GetConsoleWindow();
 
-	if (GetEnvironmentVariableW(L"TASKBAR_VISIBLE", szVisible, BUFSIZ - 1) && szVisible[0] == L'0')
-	{
+	if (GetEnvironmentVariableW(L"TASKBAR_VISIBLE", szVisible, BUFSIZ - 1) && szVisible[0] == L'0') {
 		ShowWindow(hConsole, SW_HIDE);
 	}
-	else
-	{
+	else {
 		SetForegroundWindow(hConsole);
 	}
 
-	if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)ConsoleHandler, TRUE) == FALSE)
-	{
+	if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)ConsoleHandler, TRUE) == FALSE) {
 		Log::Error(L"Unable to install handler!\n");
 		return FALSE;
 	}
 
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
-	if (GetConsoleScreenBufferInfo(GetStdHandle(STD_ERROR_HANDLE), &csbi))
-	{
+	if (GetConsoleScreenBufferInfo(GetStdHandle(STD_ERROR_HANDLE), &csbi)) {
 		COORD size = csbi.dwSize;
-		if (size.Y < 2048)
-		{
+		if (size.Y < 2048) {
 			size.Y = 2048;
-			if (!SetConsoleScreenBufferSize(GetStdHandle(STD_ERROR_HANDLE), size))
-			{
+			if (!SetConsoleScreenBufferSize(GetStdHandle(STD_ERROR_HANDLE), size)) {
 				Log::Error(L"Unable to set console screen buffer size!\n");
 			}
 		}
@@ -275,20 +250,17 @@ static BOOL CreateConsole()
 	return TRUE;
 }
 
-BOOL ExecCmdline()
-{
+BOOL ExecCmdline() {
 	SetWindowText(hConsole, szTitle);
 	STARTUPINFO si = { sizeof(si) };
 	PROCESS_INFORMATION pi;
 	si.dwFlags = STARTF_USESHOWWINDOW;
 	si.wShowWindow = TRUE;
 	BOOL bRet = CreateProcess(NULL, szCommandLine, NULL, NULL, FALSE, NULL, NULL, NULL, &si, &pi);
-	if (bRet)
-	{
+	if (bRet) {
 		dwChildrenPid = MyGetProcessId(pi.hProcess);
 	}
-	else
-	{
+	else {
 		Log::Error(L"Execute \"%s\" failed!\n", szCommandLine);
 		MessageBox(NULL, L"Error: File 'aria2c.exe' not found.", szCommandLine, MB_OK | MB_ICONERROR);
 		ExitProcess(0);
@@ -298,8 +270,7 @@ BOOL ExecCmdline()
 	return TRUE;
 }
 
-static BOOL ReloadCmdline()
-{
+static BOOL ReloadCmdline() {
 	//HANDLE hProcess = OpenProcess(SYNCHRONIZE|PROCESS_TERMINATE, FALSE, dwChildrenPid);
 	//if (hProcess)
 	//{
@@ -321,8 +292,7 @@ static BOOL ReloadCmdline()
 //
 //  目标: 注册窗口类。
 //
-ATOM MyRegisterClass(HINSTANCE hInstance)
-{
+ATOM MyRegisterClass(HINSTANCE hInstance) {
 	WNDCLASSEXW wcex;
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
@@ -352,15 +322,13 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //        在此函数中，我们在全局变量中保存实例句柄并
 //        创建和显示主程序窗口。
 //
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
-{
+BOOL InitInstance(HINSTANCE hInstance, int nCmdShow) {
 	hInst = hInstance; // 将实例句柄存储在全局变量中
 
 	hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPED | WS_SYSMENU,
 		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
 
-	if (!hWnd)
-	{
+	if (!hWnd) {
 		return FALSE;
 	}
 
@@ -373,8 +341,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
 	_In_ LPWSTR    lpCmdLine,
-	_In_ int       nCmdShow)
-{
+	_In_ int       nCmdShow) {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 	//StringCchCopyW(szCommandLine, sizeof(szCommandLine) / sizeof(szCommandLine[0]) - 1, lpCmdLine);
@@ -388,35 +355,29 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	MyRegisterClass(hInstance);
 
 	// Process URL scheme
-	if (wcsstr(lpCmdLine, SCHEME_BROWSE) == lpCmdLine) // lpCmdLine starts with SCHEME_BROWSE
-	{
+	if (wcsstr(lpCmdLine, SCHEME_BROWSE) == lpCmdLine) {// lpCmdLine starts with SCHEME_BROWSE	
 		WCHAR path[MAX_PATH];
 		StringCchCopyW(path, MAX_PATH, lpCmdLine + lstrlen(SCHEME_BROWSE));
 		UrlUnescapeW(path, NULL, NULL, URL_UNESCAPE_INPLACE | URL_UNESCAPE_AS_UTF8);
-		if (PathIsDirectoryW(path))
-		{
+		if (PathIsDirectoryW(path)) {
 			ShellExecute(NULL, L"open", path, NULL, NULL, SW_SHOWNORMAL);
 		}
-		else
-		{
+		else {
 			HRESULT hr = CoInitialize(NULL);
 			PIDLIST_ABSOLUTE pidl = ILCreateFromPathW(path);
-			if (SUCCEEDED(hr) && pidl)
-			{
+			if (SUCCEEDED(hr) && pidl) {
 				SHOpenFolderAndSelectItems(pidl, 0, NULL, 0);
 				ILFree(pidl);
 			}
 		}
 		exit(0);
 	}
-	else if (lstrlen(lpCmdLine) != 0 && lstrcmp(lpCmdLine, SCHEME_START) != 0)
-	{
+	else if (lstrlen(lpCmdLine) != 0 && lstrcmp(lpCmdLine, SCHEME_START) != 0) {
 		exit(0);
 	}
 
 	// 执行应用程序初始化:
-	if (!InitInstance(hInstance, SW_HIDE))
-	{
+	if (!InitInstance(hInstance, SW_HIDE)) {
 		return FALSE;
 	}
 
@@ -428,10 +389,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	MSG msg;
 	HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_TASKBAR));
 	// 主消息循环:
-	while (GetMessage(&msg, nullptr, 0, 0))
-	{
-		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
-		{
+	while (GetMessage(&msg, nullptr, 0, 0)) {
+		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
@@ -450,22 +409,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 //  WM_DESTROY  - 发送退出消息并返回
 //
 //
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	static UINT WM_TASKBARCREATED = 0;
 	if (WM_TASKBARCREATED == 0)
 		WM_TASKBARCREATED = RegisterWindowMessage(L"TaskbarCreated");
 
-	switch (message)
-	{
+	switch (message) {
 	case WM_TASKBARNOTIFY:
-		if (lParam == WM_LBUTTONUP)
-		{
+		if (lParam == WM_LBUTTONUP) {
 			ShowWindow(hConsole, !IsWindowVisible(hConsole));
 			SetForegroundWindow(hConsole);
 		}
-		else if (lParam == WM_RBUTTONUP)
-		{
+		else if (lParam == WM_RBUTTONUP) {
 			SetForegroundWindow(hWnd);
 			ShowPopupMenu();
 		}
@@ -484,18 +439,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			ShowWindow(hConsole, SW_HIDE);
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_REG:
-			if (RegUrlScheme())
-			{
+			if (RegUrlScheme()) {
 				MessageBox(nullptr, L"Register Aria2 to system successfully!", L"Success", MB_OK | MB_ICONINFORMATION);
 			}
-			else
-			{
+			else {
 				MessageBox(nullptr, L"Register Aria2 to system failed, please run as administrator!", L"Failure", MB_OK | MB_ICONERROR);
 			}
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_UNREG:
-			if (UnRegUrlScheme())
-			{
+			if (UnRegUrlScheme()) {
 				MessageBox(nullptr, L"Unregister Aria2 from system successfully!", L"Success", MB_OK | MB_ICONINFORMATION);
 			}
 			else
@@ -504,12 +456,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_AUTORUN:
-			if (isAutoStartupSet(APP_NAME))
-			{
+			if (isAutoStartupSet(APP_NAME)) {
 				disableAutoStartup(APP_NAME);
 			}
-			else
-			{
+			else {
 				enableAutoStartup(APP_NAME);
 			}
 			break;
@@ -537,8 +487,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		PostQuitMessage(0);
 		break;
 	default:
-		if (message == WM_TASKBARCREATED)
-		{
+		if (message == WM_TASKBARCREATED) {
 			ShowTrayIcon(NIM_ADD);
 			break;
 		}
@@ -549,8 +498,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 
 // “关于”框的消息处理程序。
-INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
+INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
 	UNREFERENCED_PARAMETER(lParam);
 	HWND hwndLink = GetDlgItem(hDlg, IDC_LINK);
 	HBRUSH hBrush = (HBRUSH)GetStockObject(NULL_BRUSH);
@@ -558,26 +506,22 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	HDC hdcStatic = (HDC)wParam;
 	HWND hwndStatic = (HWND)lParam;
 
-	switch (message)
-	{
+	switch (message) {
 	case WM_INITDIALOG:
 		return (INT_PTR)TRUE;
 
 	case WM_COMMAND:
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-		{
+		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
 			EndDialog(hDlg, LOWORD(wParam));
 			return (INT_PTR)TRUE;
 		}
-		if (LOWORD(wParam) == IDC_LINK && HIWORD(wParam) == STN_CLICKED)
-		{
+		if (LOWORD(wParam) == IDC_LINK && HIWORD(wParam) == STN_CLICKED) {
 			ShellExecute(NULL, L"open", L"https://www.aria2e.com/", NULL, NULL, SW_SHOWNORMAL);
 		}
 		break;
 
 	case WM_CTLCOLORSTATIC:
-		if (hwndStatic == hwndLink)
-		{
+		if (hwndStatic == hwndLink) {
 			SetTextColor(hdcStatic, RGB(0, 0, 255));  // 设置字体颜色为蓝色
 			SetBkMode(hdcStatic, TRANSPARENT);       // 设置背景透明
 			return (INT_PTR)hBrush;                           // 返回空画刷
@@ -597,8 +541,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	return (INT_PTR)FALSE;
 }
 
-BOOL mouseInControl(HWND hDlg, HWND hwndCtrl)
-{
+BOOL mouseInControl(HWND hDlg, HWND hwndCtrl) {
 	POINT pt;
 	RECT rect;
 	GetCursorPos(&pt);  // 获取当前鼠标的屏幕坐标
@@ -606,28 +549,24 @@ BOOL mouseInControl(HWND hDlg, HWND hwndCtrl)
 	return PtInRect(&rect, pt);     // 判断鼠标是否在控件区域内
 }
 
-BOOL RegUrlScheme()
-{
+BOOL RegUrlScheme() {
 	HKEY hKey = nullptr;
 	LSTATUS status;
 	BOOL result = false;
 
 	// 创建或打开 HKEY_CLASSES_ROOT\aria2 键，失败则创建HKEY_CURRENT_USER\Software\Classes\aria2
 	status = RegCreateKeyExW(HKEY_CLASSES_ROOT, L"aria2", 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
-	if (status != ERROR_SUCCESS)
-	{
+	if (status != ERROR_SUCCESS) {
 		status = RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Classes\\aria2", 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
 	}
-	if (status != ERROR_SUCCESS)
-	{
+	if (status != ERROR_SUCCESS) {
 		// 错误处理
 		return false;
 	}
 
 	// 设置默认值为 "URL:aria2 Protocol"
 	status = RegSetValueExW(hKey, nullptr, 0, REG_SZ, reinterpret_cast<const BYTE*>(L"URL:Aria2 Protocol"), (wcslen(L"URL:Aria2 Protocol") + 1) * sizeof(WCHAR));
-	if (status != ERROR_SUCCESS)
-	{
+	if (status != ERROR_SUCCESS) {
 		// 错误处理
 		RegCloseKey(hKey);
 		return false;
@@ -635,8 +574,7 @@ BOOL RegUrlScheme()
 
 	// 创建"URL Protocol"字符串
 	status = RegSetValueExW(hKey, L"URL Protocol", 0, REG_SZ, 0, 0);
-	if (status != ERROR_SUCCESS)
-	{
+	if (status != ERROR_SUCCESS) {
 		// 错误处理
 		RegCloseKey(hKey);
 		return false;
@@ -645,8 +583,7 @@ BOOL RegUrlScheme()
 	// 创建或打开 .\aria2\shell\open\command 键
 	HKEY hKeyCommand = nullptr;
 	status = RegCreateKeyExW(hKey, L"shell\\open\\command", 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKeyCommand, nullptr);
-	if (status != ERROR_SUCCESS)
-	{
+	if (status != ERROR_SUCCESS) {
 		// 错误处理
 		RegCloseKey(hKey);
 		return false;
@@ -657,8 +594,7 @@ BOOL RegUrlScheme()
 	GetModuleFileName(NULL, command, sizeof(command) / sizeof(command[0]) - 1);
 	StringCchCatW(command, sizeof(command) / sizeof(command[0]) - 1, L" %1");
 	status = RegSetValueExW(hKeyCommand, nullptr, 0, REG_SZ, reinterpret_cast<const BYTE*>(command), (lstrlen(command) + 1) * sizeof(WCHAR));
-	if (status != ERROR_SUCCESS)
-	{
+	if (status != ERROR_SUCCESS) {
 		// 错误处理
 		RegCloseKey(hKeyCommand);
 		RegCloseKey(hKey);
@@ -672,28 +608,23 @@ BOOL RegUrlScheme()
 	return true;
 }
 
-BOOL UnRegUrlScheme()
-{
+BOOL UnRegUrlScheme() {
 	BOOL result = RegDeleteTree(HKEY_CLASSES_ROOT, L"aria2") == ERROR_SUCCESS;
-	if (!result)
-	{
+	if (!result) {
 		result = RegDeleteTree(HKEY_CURRENT_USER, L"Software\\Classes\\aria2") == ERROR_SUCCESS;
 	}
 
 	return result;
 }
 
-BOOL isUrlSchemeReged()
-{
+BOOL isUrlSchemeReged() {
 	HKEY hKey;
 	BOOL result = false;
 	LSTATUS status = RegOpenKeyEx(HKEY_CLASSES_ROOT, L"aria2\\shell\\open\\command", 0, KEY_READ, &hKey);
-	if (status != ERROR_SUCCESS)
-	{
+	if (status != ERROR_SUCCESS) {
 		status = RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Classes\\aria2\\shell\\open\\command", 0, KEY_READ, &hKey);
 	}
-	if (status == ERROR_SUCCESS)
-	{
+	if (status == ERROR_SUCCESS) {
 		DWORD dataSize = 0;
 		status = RegQueryValueExW(hKey, NULL, NULL, NULL, NULL, &dataSize);
 		if (status == ERROR_SUCCESS) {
@@ -712,8 +643,7 @@ BOOL isUrlSchemeReged()
 	return result;
 }
 
-BOOL enableAutoStartup(const wchar_t* appName)
-{
+BOOL enableAutoStartup(const wchar_t* appName) {
 	HKEY hKey;
 	BOOL success = false;
 
