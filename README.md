@@ -16,11 +16,24 @@ Aria2 Manager is a useful tool that allows user to run [Aria2](https://github.co
 
 ![Aria2 Manager](./Screenshot/aria2manager.png)
 
-## Install via Windows Store
+## Enhanced version 
+
+**Aria2 Manager** enhanced version has been delivered to Microsoft Store
+
+### Enhanced feature
+
+- 🔄️ Support for enabling startup on boot
+- 👆 One-click installation and automatic update
+- 🫷 Suppress task notification on Aria2 startup
+- 🛠️ Some Aria2 bug fixes
+- 🧼 Support for removing download file(s)
+(Remove .aria2 control file when remove task, remove download file(s) with <kbd>Shift</kbd>, *needs **Aria2 Explorer** v2.4.0+*)
+
+### Installation
 
 [<img src="https://get.microsoft.com/images/en-us%20dark.svg" height="56"/>](https://apps.microsoft.com/detail/Aria2%20Manager/9P5WQ68Q20WV?launch=true&cid=github)
 
-The Window Store version will keep the Aria2 utility always latest and update BT tracker configuration periodically. Also, there will be more features in the future.
+The enhanced version will always keep the Aria2 binary latest and update BT tracker list opportunistically. Also, there will be more features in the future.
 
 ## Reference 
 

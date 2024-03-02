@@ -16,11 +16,23 @@ Aria2 Manager 是一个能够让 [Aria2](https://github.com/aria2/aria2) 在后�
 
 ![Aria2 Manager](./Screenshot/aria2manager.png)
 
-## 安装 Windows 商店版 
+## 增强版 
+
+**Aria2 Manager** 增强版 已上架微软商店。
+
+### 增强特性
+
+- 🔄️ 支持开机自启动
+- 👆 一键安装并自动更新
+- 🛠️ 一些 Aria2 问题修复
+- 🫷 禁止 Aria2 开启时的已完成任务通知
+- 🧼 支持删除已下载文件 （删除任务的同时删除 .aria2 控制文件，<kbd>Shift</kbd> + **删除任务** 删除下载文件，*需要 **Aria2 Explorer** v2.4.0+*）
+
+### 安装
 
 [<img src="https://get.microsoft.com/images/en-us%20dark.svg" height="56"/>](https://apps.microsoft.com/detail/Aria2%20Manager/9P5WQ68Q20WV?launch=true&cid=github)
 
-商店版将会定期更新Aria2主程序和BT Tracker信息，未来还会加入更多的功能。
+商店版将会不定期更新 Aria2 主程序和 BT Tracker 列表，未来还会加入更多的功能，敬请期待。
 
 ## 参考 
 
