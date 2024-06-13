@@ -81,24 +81,34 @@ static DWORD MyGetProcessId(HANDLE hProcess) {
 
 
 static BOOL MyEndTask(DWORD pid) {
+	BOOL ret = TRUE;
 	DWORD DELAYTIME = 2000;
 	HANDLE hPrc;
 
 	if (0 == pid) return FALSE;
 
-	hPrc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);  // Opens handle to the process.  
+	hPrc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);  // Opens handle to the process.
 
-	if (!TerminateProcess(hPrc, 0)) { // Terminates a process.  
-
-		CloseHandle(hPrc);
+	if (hPrc == NULL) {
+		Log::Warn(L"Open child process handler failed. Error code = %lu", GetLastError());
 		return FALSE;
 	}
-	else {
-		WaitForSingleObject(hPrc, DELAYTIME); // At most ,wait 2000  millisecond.  
+	GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid);
+
+	DWORD waitResult = WaitForSingleObject(hPrc, DELAYTIME);
+
+	if (waitResult != WAIT_OBJECT_0) {
+		if (!TerminateProcess(hPrc, 0)) { // Terminates a process.
+			ret = FALSE;
+		}
+		else {
+			WaitForSingleObject(hPrc, DELAYTIME); // At most ,wait 2000  millisecond.  
+		}
 	}
+	if (ret) Log::Info(L"Child process quit gracefully.");
 
 	CloseHandle(hPrc);
-	return TRUE;
+	return ret;
 }
 
 static BOOL ShowTrayIcon(DWORD dwMessage) {
@@ -285,9 +295,10 @@ static BOOL ReloadCmdline() {
 	ShowWindow(hConsole, SW_SHOW);
 	SetForegroundWindow(hConsole);
 	wprintf(L"\n\n");
-	MyEndTask(dwChildrenPid);
+	if (MyEndTask(dwChildrenPid)) {
+		dwChildrenPid = 0;
+	};
 	wprintf(L"\n\n");
-	Sleep(200);
 	ExecCmdline();
 	return TRUE;
 }
