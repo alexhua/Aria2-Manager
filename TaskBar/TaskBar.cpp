@@ -7,6 +7,10 @@
 
 #pragma comment(lib, "shlwapi.lib")
 
+#pragma comment(linker,"\"/manifestdependency:type='win32' \
+name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
+processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+
 #define WM_TASKBARNOTIFY WM_USER+20
 #define WM_TASKBARNOTIFY_MENUITEM_SHOW (WM_USER + 21)
 #define WM_TASKBARNOTIFY_MENUITEM_HIDE (WM_USER + 22)
@@ -23,12 +27,14 @@ constexpr auto MAX_LOADSTRING = 100;
 const WCHAR* APP_NAME = L"Aria2 Manager";
 const WCHAR* SCHEME_START = L"aria2://start/";
 const WCHAR* SCHEME_BROWSE = L"aria2://browse/path=";
+const WCHAR* APP_MUTEX_NAME = L"Global\\Aria2ManagerMutex";
 
 
 // 全局变量:
 HINSTANCE hInst;                                // 当前实例
 HWND hWnd;
 HWND hConsole;
+HANDLE hMutex;
 WCHAR szTitle[MAX_LOADSTRING];                  // 标题栏文本
 WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 WCHAR szCommandLine[1024] = L"";
@@ -325,6 +331,19 @@ ATOM MyRegisterClass(HINSTANCE hInstance) {
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow) {
 	hInst = hInstance; // 将实例句柄存储在全局变量中
 
+	HANDLE hMutex = CreateMutexW(NULL, FALSE, APP_MUTEX_NAME);
+	// 检查是否已有实例在运行
+	if (hMutex == NULL || GetLastError() == ERROR_ALREADY_EXISTS) {
+		hWnd = FindWindow(szWindowClass, NULL);
+		if (hWnd) {
+			PostMessageW(hWnd, WM_COMMAND, WM_TASKBARNOTIFY_MENUITEM_SHOW, 0); // 发送自定义消息
+		}
+		if (hMutex != NULL) {
+			CloseHandle(hMutex);
+		}
+		return FALSE; // 已有实例在运行
+	}
+
 	hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPED | WS_SYSMENU,
 		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
 
@@ -394,6 +413,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
+	}
+
+	if (hMutex) {
+		ReleaseMutex(hMutex);
+		CloseHandle(hMutex);
 	}
 
 	return (int)msg.wParam;
