@@ -20,16 +20,18 @@ Aria2 Manager is a useful tool that allows user to run [Aria2](https://github.co
 
 ## Enhanced version 
 
-**Aria2 Manager** enhanced version has been delivered to Microsoft Store
+**Aria2 Manager** enhanced version with built-in task management UI has been launched to Microsoft Store.
 
 ### Enhanced features
 
 - 🛠️ Some Aria2 bug fixes
 - 🔄️ Auto-startup on boot
+- 🪟 Built-in task management UI
 - 🔀 BT and DHT port mapping via UPnP
 - 👆 One-click installation and automatic update
 - 🔕 Suppress task notification on Aria2 startup
-- 🧹 Support for removing **.aria2** control file and downloaded file(s) ( <kbd>Shift</kbd> + **Remove Task**, needs ***Aria2 Explorer v2.4.0+*** )
+- ⚡ Click on the task name to open the downloaded file directly
+- 🧹 Support for removing **.aria2** control file and downloaded file(s) ( <kbd>Shift</kbd> + **Remove Task** )
 
 ### Installation
 
