@@ -148,7 +148,7 @@ static BOOL ShowPopupMenu() {
 
 	HMENU hMenu = CreatePopupMenu();
 	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_ABOUT, (isZHCHS ? L"关于" : (isZHCHT ? L"關於" : L"About")));
-	if (!IsWindowVisible(hConsole)) {
+	if (!IsWindowVisible(hWnd)) {
 		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_SHOW, (isZHCHS ? L"显示" : (isZHCHT ? L"顯示" : L"Show")));
 	}
 	else {
@@ -233,11 +233,16 @@ static BOOL CreateConsole() {
 
 	hConsole = GetConsoleWindow();
 
+	LONG style = GetWindowLong(hConsole, GWL_STYLE) | WS_CHILD;
+	style &= ~(WS_CAPTION | WS_THICKFRAME);
+	SetWindowLong(hConsole, GWL_STYLE, style);
+	SetParent(hConsole, hWnd);
+
 	if (GetEnvironmentVariableW(L"TASKBAR_VISIBLE", szVisible, BUFSIZ - 1) && szVisible[0] == L'0') {
-		ShowWindow(hConsole, SW_HIDE);
+		ShowWindow(hWnd, SW_HIDE);
 	}
 	else {
-		SetForegroundWindow(hConsole);
+		SetForegroundWindow(hWnd);
 	}
 
 	if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)ConsoleHandler, TRUE) == FALSE) {
@@ -267,7 +272,7 @@ static BOOL CreateConsole() {
 }
 
 BOOL ExecCmdline() {
-	SetWindowText(hConsole, szTitle);
+	SetWindowText(hWnd, szTitle);
 	STARTUPINFO si = { sizeof(si) };
 	PROCESS_INFORMATION pi;
 	si.dwFlags = STARTF_USESHOWWINDOW;
@@ -292,8 +297,8 @@ static BOOL ReloadCmdline() {
 	//{
 	//	TerminateProcess(hProcess, 0);
 	//}
-	ShowWindow(hConsole, SW_SHOW);
-	SetForegroundWindow(hConsole);
+	ShowWindow(hWnd, SW_SHOW);
+	SetForegroundWindow(hWnd);
 	wprintf(L"\n\n");
 	if (MyEndTask(dwChildrenPid)) {
 		dwChildrenPid = 0;
@@ -355,7 +360,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow) {
 		return FALSE; // 已有实例在运行
 	}
 
-	hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPED | WS_SYSMENU,
+	hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW | WS_SYSMENU | WS_SIZEBOX,
 		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
 
 	if (!hWnd) {
@@ -416,6 +421,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	Log::Info(L"Aria2 is starting...\n");
 	ShowTrayIcon(NIM_ADD);
 
+	RegisterApplicationRestart(NULL, RESTART_NO_CRASH | RESTART_NO_HANG);
+
 	MSG msg;
 	HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_TASKBAR));
 	// 主消息循环:
@@ -425,6 +432,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			DispatchMessage(&msg);
 		}
 	}
+
+	MyEndTask(dwChildrenPid);
+	DeleteTrayIcon();
 
 	if (hMutex) {
 		ReleaseMutex(hMutex);
@@ -452,8 +462,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 	switch (message) {
 	case WM_TASKBARNOTIFY:
 		if (lParam == WM_LBUTTONUP) {
-			ShowWindow(hConsole, !IsWindowVisible(hConsole));
-			SetForegroundWindow(hConsole);
+			ShowWindow(hWnd, !IsWindowVisible(hWnd));
+			SetForegroundWindow(hWnd);
 		}
 		else if (lParam == WM_RBUTTONUP) {
 			SetForegroundWindow(hWnd);
@@ -467,11 +477,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 		switch (wmId)
 		{
 		case WM_TASKBARNOTIFY_MENUITEM_SHOW:
-			ShowWindow(hConsole, SW_SHOW);
-			SetForegroundWindow(hConsole);
+			ShowWindow(hWnd, SW_SHOW);
+			SetForegroundWindow(hWnd);
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_HIDE:
-			ShowWindow(hConsole, SW_HIDE);
+			ShowWindow(hWnd, SW_HIDE);
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_REG:
 			if (RegUrlScheme()) {
@@ -505,18 +515,35 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 			DialogBoxW(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_EXIT:
-			DeleteTrayIcon();
-			PostMessage(hConsole, WM_CLOSE, 0, 0);
+			DestroyWindow(hWnd);
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
 	}
 	break;
-
+	case WM_SIZE:
+	{
+		RECT rcClient;
+		GetClientRect(hWnd, &rcClient);
+		MoveWindow(hConsole, 0, 0, rcClient.right, rcClient.bottom, TRUE);
+	}
+	break;
+	case WM_GETMINMAXINFO:
+	{
+		LPMINMAXINFO lpMMI = (LPMINMAXINFO)lParam;
+		MONITORINFO mi{ sizeof(mi) };
+		GetMonitorInfo(MonitorFromWindow(hWnd, MONITOR_DEFAULTTOPRIMARY), &mi);
+		lpMMI->ptMaxSize.x = mi.rcMonitor.right - mi.rcMonitor.left;
+		lpMMI->ptMaxSize.y = mi.rcMonitor.bottom - mi.rcMonitor.top;
+		lpMMI->ptMaxPosition.x = mi.rcMonitor.left;
+		lpMMI->ptMaxPosition.y = mi.rcMonitor.top;
+		lpMMI->ptMaxTrackSize.x = mi.rcWork.right - mi.rcWork.left;
+		lpMMI->ptMaxTrackSize.y = mi.rcWork.bottom - mi.rcWork.top;
+		break;
+	}
 	case WM_CLOSE:
-		DeleteTrayIcon();
-		PostQuitMessage(0);
+		ShowWindow(hWnd, SW_HIDE);
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
