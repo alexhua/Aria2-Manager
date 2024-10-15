@@ -1,37 +1,50 @@
 #include "Log.h"
+
 #include <cstdio>
-#include <cstdarg>
-#include <windows.h>
 
 const wchar_t* Log::APP_NAME = L"Aria2 Manager";
-Log::LogLevel_T Log::LogLevel = Log::LOG_INFO;
 
-void Log::LogMessage(LogLevel_T logType, const wchar_t* format, ...) {
+#ifdef _DEBUG
+Log::LogLevel_T Log::LogLevel = LOG_DEBUG;
+#else
+Log::LogLevel_T Log::LogLevel = Log::LOG_INFO;
+#endif
+
+void Log::LogMessage(LogLevel_T logType, const wchar_t* format, va_list args) {
 	if (logType <= LogLevel) {
 		wprintf(L"\n");
-		va_list args;
-		va_start(args, format);
 		wprintf(L"%ls %ls ", APP_NAME, GetLogLevelString(logType));
 		vwprintf(format, args);
-		va_end(args);
 		wprintf(L"\n");
 	}
 }
 
 void Log::Debug(const wchar_t* format, ...) {
-	LogMessage(LOG_DEBUG, format);
+	va_list args;
+	va_start(args, format);
+	LogMessage(LOG_DEBUG, format, args);
+	va_end(args);
 }
 
 void Log::Info(const wchar_t* format, ...) {
-	LogMessage(LOG_INFO, format);
+	va_list args;
+	va_start(args, format);
+	LogMessage(LOG_INFO, format, args);
+	va_end(args);
 }
 
 void Log::Warn(const wchar_t* format, ...) {
-	LogMessage(LOG_WARN, format);
+	va_list args;
+	va_start(args, format);
+	LogMessage(LOG_WARN, format, args);
+	va_end(args);
 }
 
 void Log::Error(const wchar_t* format, ...) {
-	LogMessage(LOG_ERROR, format);
+	va_list args;
+	va_start(args, format);
+	LogMessage(LOG_ERROR, format, args);
+	va_end(args);
 }
 
 void Log::SetLogLevel(const LogLevel_T level) {
