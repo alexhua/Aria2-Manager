@@ -390,10 +390,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	MyRegisterClass(hInstance);
 
 	// Process URL scheme
-	if (wcsstr(lpCmdLine, SCHEME_BROWSE) == lpCmdLine) {// lpCmdLine starts with SCHEME_BROWSE	
-		WCHAR path[MAX_PATH];
-		StringCchCopyW(path, MAX_PATH, lpCmdLine + lstrlen(SCHEME_BROWSE));
-		UrlUnescapeW(path, NULL, NULL, URL_UNESCAPE_INPLACE | URL_UNESCAPE_AS_UTF8);
+	if (lpCmdLine != NULL && wcsstr(lpCmdLine, SCHEME_BROWSE) == lpCmdLine) { // lpCmdLine starts with SCHEME_BROWSE	
+		WCHAR path[MAX_PATH + 1];
+		DWORD pathLen = lstrlen(lpCmdLine) - lstrlen(SCHEME_BROWSE);
+		UrlUnescapeW(lpCmdLine + lstrlen(SCHEME_BROWSE), path, &pathLen, URL_UNESCAPE_AS_UTF8);
 		if (PathIsDirectoryW(path)) {
 			ShellExecute(NULL, L"open", path, NULL, NULL, SW_SHOWNORMAL);
 		}
