@@ -2,17 +2,10 @@
 
 Aria2 Manager is a useful tool that allows user to run [Aria2](https://github.com/aria2/aria2) in the background easily. (Only for Windows)
 
-## Usage (only for local use)
+## Usage
+- For *most users*, it is recommended to install **Aria2 Manager** from the [Microsoft Store](#installation), try out the basic features of Aria2 for free, install with one click, and update automatically; you can also purchase and unlock the [**Enhanced Edition**](#enhanced-features), which has more features, better experience, and saves time and effort.
 
-- For *power user*, it is recommended to download the [**Enhanced Version**](#enhanced-features), which has more features, better experience, one-click installation, automatic updates, saving time and effort for you.
-
-- For *fresh new user*, if you had only installed [Aria2 Explorer](https://github.com/alexhua/aria2-explorer), please download **setup version**. After installation, you could enjoy all the Aria2 download features. 
-
-- For *DIY user*, please download the **full version** zip which already contains the latest **aria2c.exe** and configuration files. Just extract it and run **Aria2Manager.exe**. Then, the extension should work well with default RPC settings.
-
-- For Aria2 *veteran user*, please download **standalone version** and extract **Aria2Manager.exe** to the directory where **aria2c.exe** exists, and rename your configuration file to **aria2.conf**. Then, you could start up Aria2 in the background by running **Aria2Manager.exe**.
-
-> To [Aria2 Explorer](https://github.com/alexhua/aria2-explorer) user, regarding the `Start Aria2` and `Open Download Folder` features, the extension needs to implement them through the use of **Aria2 Manager**. To enable these features, please run **Aria2 Manager.exe** as an administrator and click on `Register` in the option menu to set **Aria2Manager.exe** as the default application for the `aria2://` protocol at first time. Once the registration is successful, users could click on `Unregister` to unregister **Aria2Manager.exe** from the `aria2://` protocol if you do not need it anymore. （Requirement: Version ≥ v1.1）
+- For *DIY users*, please download the [**GitHub Edition**](https://github.com/alexhua/Aria2-Manager/releases/download/v1.1.7/Aria2Manager.zip), unzip **Aria2Manager.exe** to the directory where **aria2c.exe** is located, and rename your configuration file to **aria2.conf**. You can run Aria2 in the background through **Aria2Manager.exe**. For the first use, you need to click `Register` in the menu to enable the **Launch Aria2** and **Open Downloaded File** functions of [Aria2 Explorer](https://github.com/alexhua/aria2-explorer).
 
 ## Screenshot
 
@@ -27,11 +20,14 @@ Aria2 Manager is a useful tool that allows user to run [Aria2](https://github.co
 - 🛠️ Some Aria2 bug fixes
 - 🔄️ Auto-startup on boot
 - 🪟 Built-in task management UI
-- 🔀 BT and DHT port mapping via UPnP
+- 🩺 Display status on tray icon tip
+- 🔀 UPnP port mapping for BT and DHT
 - 👆 One-click installation and automatic update
-- 🔕 Suppress task notification on Aria2 startup
+- 🔔 Notify task status via system notification
+- 🔕 Suppress task finished notification on Aria2 startup
+- 📄 Associate Torrent file and set as default open program
 - ⚡ Click on the task name to open the downloaded file directly
-- 🧹 Support for removing **.aria2** control file and downloaded file(s) ( <kbd>Shift</kbd> + **Remove Task** )
+- 🧹 Support for removing .aria2 control file and downloaded file(s) ( Shift + Remove Task )
 
 ### Installation
 
