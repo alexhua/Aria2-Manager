@@ -43,6 +43,7 @@ WCHAR szBalloon[512] = L"";
 WCHAR szFullPath[MAX_PATH] = L"";
 WCHAR szEnvironment[1024] = L"";
 volatile DWORD dwChildrenPid;
+BOOL gDisableLogWindow = FALSE;
 
 
 static DWORD MyGetProcessId(HANDLE hProcess) {
@@ -148,11 +149,13 @@ static BOOL ShowPopupMenu() {
 
 	HMENU hMenu = CreatePopupMenu();
 	AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_ABOUT, (isZHCHS ? L"关于" : (isZHCHT ? L"關於" : L"About")));
-	if (!IsWindowVisible(hWnd)) {
-		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_SHOW, (isZHCHS ? L"显示" : (isZHCHT ? L"顯示" : L"Show")));
-	}
-	else {
-		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_HIDE, (isZHCHS ? L"隐藏" : (isZHCHT ? L"隱藏" : L"Hide")));
+	if (!gDisableLogWindow) {
+		if (!IsWindowVisible(hWnd)) {
+			AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_SHOW, (isZHCHS ? L"显示" : (isZHCHT ? L"顯示" : L"Show")));
+		}
+		else {
+			AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_HIDE, (isZHCHS ? L"隐藏" : (isZHCHT ? L"隱藏" : L"Hide")));
+		}
 	}
 	if (!isUrlSchemeReged()) {
 		AppendMenu(hMenu, MF_STRING, WM_TASKBARNOTIFY_MENUITEM_REG, (isZHCHS ? L"注册" : (isZHCHT ? L"注冊" : L"Register")));
@@ -277,7 +280,11 @@ BOOL ExecCmdline() {
 	PROCESS_INFORMATION pi;
 	si.dwFlags = STARTF_USESHOWWINDOW;
 	si.wShowWindow = TRUE;
-	BOOL bRet = CreateProcess(NULL, szCommandLine, NULL, NULL, FALSE, NULL, NULL, NULL, &si, &pi);
+	DWORD creationFlags = 0;
+	if (gDisableLogWindow) {
+		creationFlags |= CREATE_NO_WINDOW;
+	}
+	BOOL bRet = CreateProcess(NULL, szCommandLine, NULL, NULL, FALSE, creationFlags, NULL, NULL, &si, &pi);
 	if (bRet) {
 		dwChildrenPid = MyGetProcessId(pi.hProcess);
 	}
@@ -297,13 +304,17 @@ static BOOL ReloadCmdline() {
 	//{
 	//	TerminateProcess(hProcess, 0);
 	//}
-	ShowWindow(hWnd, SW_SHOW);
-	SetForegroundWindow(hWnd);
-	wprintf(L"\n\n");
+	if (!gDisableLogWindow) {
+		ShowWindow(hWnd, SW_SHOW);
+		SetForegroundWindow(hWnd);
+		wprintf(L"\n\n");
+	}
 	if (MyEndTask(dwChildrenPid)) {
 		dwChildrenPid = 0;
 	};
-	wprintf(L"\n\n");
+	if (!gDisableLogWindow) {
+		wprintf(L"\n\n");
+	}
 	ExecCmdline();
 	return TRUE;
 }
@@ -390,10 +401,25 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	MyRegisterClass(hInstance);
 
 	// Process URL scheme
-	if (lpCmdLine != NULL && wcsstr(lpCmdLine, SCHEME_BROWSE) == lpCmdLine) { // lpCmdLine starts with SCHEME_BROWSE	
+	int argc = 0;
+	LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+	const WCHAR* firstArg = nullptr;
+	if (argv != NULL) {
+		for (int i = 1; i < argc; i++) {
+			if (argv[i] != NULL && wcscmp(argv[i], L"--disable-log-window") == 0) {
+				gDisableLogWindow = TRUE;
+				continue;
+			}
+			if (argv[i] != NULL && firstArg == nullptr) {
+				firstArg = argv[i];
+			}
+		}
+	}
+
+	if (firstArg != NULL && wcsstr(firstArg, SCHEME_BROWSE) == firstArg) {
 		WCHAR path[MAX_PATH + 1];
-		DWORD pathLen = lstrlen(lpCmdLine) - lstrlen(SCHEME_BROWSE);
-		UrlUnescapeW(lpCmdLine + lstrlen(SCHEME_BROWSE), path, &pathLen, URL_UNESCAPE_AS_UTF8);
+		DWORD pathLen = lstrlen(firstArg) - lstrlen(SCHEME_BROWSE);
+		UrlUnescapeW((LPWSTR)(firstArg + lstrlen(SCHEME_BROWSE)), path, &pathLen, URL_UNESCAPE_AS_UTF8);
 		if (PathIsDirectoryW(path)) {
 			ShellExecute(NULL, L"open", path, NULL, NULL, SW_SHOWNORMAL);
 		}
@@ -405,10 +431,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 				ILFree(pidl);
 			}
 		}
+		if (argv != NULL) {
+			LocalFree(argv);
+		}
 		exit(0);
 	}
-	else if (lstrlen(lpCmdLine) != 0 && lstrcmp(lpCmdLine, SCHEME_START) != 0) {
+	else if (firstArg != NULL && lstrcmp(firstArg, SCHEME_START) != 0) {
+		if (argv != NULL) {
+			LocalFree(argv);
+		}
 		exit(0);
+	}
+	if (argv != NULL) {
+		LocalFree(argv);
 	}
 
 	// 执行应用程序初始化:
@@ -416,7 +451,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 	}
 
-	CreateConsole();
+	if (!gDisableLogWindow) {
+		CreateConsole();
+	}
 	ExecCmdline();
 	Log::Info(L"Aria2 is starting...\n");
 	ShowTrayIcon(NIM_ADD);
@@ -462,8 +499,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 	switch (message) {
 	case WM_TASKBARNOTIFY:
 		if (lParam == WM_LBUTTONUP) {
-			ShowWindow(hWnd, !IsWindowVisible(hWnd));
 			SetForegroundWindow(hWnd);
+			if (gDisableLogWindow) {
+				ShowPopupMenu();
+			}
+			else {
+				ShowWindow(hWnd, !IsWindowVisible(hWnd));
+				SetForegroundWindow(hWnd);
+			}
 		}
 		else if (lParam == WM_RBUTTONUP) {
 			SetForegroundWindow(hWnd);
@@ -477,11 +520,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 		switch (wmId)
 		{
 		case WM_TASKBARNOTIFY_MENUITEM_SHOW:
-			ShowWindow(hWnd, SW_SHOW);
-			SetForegroundWindow(hWnd);
+			if (!gDisableLogWindow) {
+				ShowWindow(hWnd, SW_SHOW);
+				SetForegroundWindow(hWnd);
+			}
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_HIDE:
-			ShowWindow(hWnd, SW_HIDE);
+			if (!gDisableLogWindow) {
+				ShowWindow(hWnd, SW_HIDE);
+			}
 			break;
 		case WM_TASKBARNOTIFY_MENUITEM_REG:
 			if (RegUrlScheme()) {
@@ -526,7 +573,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 	{
 		RECT rcClient;
 		GetClientRect(hWnd, &rcClient);
-		MoveWindow(hConsole, 0, 0, rcClient.right, rcClient.bottom, TRUE);
+		if (hConsole != NULL) {
+			MoveWindow(hConsole, 0, 0, rcClient.right, rcClient.bottom, TRUE);
+		}
 	}
 	break;
 	case WM_GETMINMAXINFO:
