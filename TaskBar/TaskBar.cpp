@@ -210,7 +210,9 @@ static BOOL SetEenvironment() {
 
 	GetEnvironmentVariableW(L"TASKBAR_TITLE", szTitle, sizeof(szTitle) / sizeof(szTitle[0]) - 1);
 	GetEnvironmentVariableW(L"TASKBAR_TOOLTIP", szTooltip, sizeof(szTooltip) / sizeof(szTooltip[0]) - 1);
-	GetEnvironmentVariableW(isZHCN ? L"TASKBAR_BALLOON_CN" : L"TASKBAR_BALLOON", szBalloon, sizeof(szBalloon) / sizeof(szBalloon[0]) - 1);
+	if (!isUrlSchemeReged()) {
+		GetEnvironmentVariableW(isZHCN ? L"TASKBAR_BALLOON_CN" : L"TASKBAR_BALLOON", szBalloon, sizeof(szBalloon) / sizeof(szBalloon[0]) - 1);
+	}
 
 	return TRUE;
 }
