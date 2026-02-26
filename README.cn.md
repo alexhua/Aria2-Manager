@@ -27,6 +27,7 @@ Aria2 Manager 是一个能够让 [Aria2](https://github.com/aria2/aria2) 在后�
 - 📄 关联种子文件和磁力链接
 - ⚡ 点击任务名直接打开已下载文件
 - 🔕 禁止 Aria2 开启时的已完成任务通知
+- ⏩ 自动更新BT Trackers和更有效的Tracker请求机制
 - 🔀 支持通过 UPnP 协议进行 BT 和 DHT 端口映射，提升 BT 下载连接的连通性
 - 🧹 支持删除 .aria2 控制文件和已下载文件（ Shift + 删除任务）
 

@@ -27,6 +27,7 @@ Aria2 Manager is a useful tool that allows user to run [Aria2](https://github.co
 - 🔕 Suppress task finished notification on Aria2 startup
 - 📄 Associate Torrent file and set as default open program
 - ⚡ Click on the task name to open the downloaded file directly
+- ⏩ Automatic updating of BT trackers and a more efficient tracker request mechanism
 - 🧹 Support for removing .aria2 control file and downloaded file(s) ( Shift + Remove Task )
 
 ### Installation
