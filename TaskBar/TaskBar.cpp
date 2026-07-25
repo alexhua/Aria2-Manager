@@ -1,4 +1,4 @@
-﻿// TaskBar.cpp : 定义应用程序的入口点。
+// TaskBar.cpp : 定义应用程序的入口点。
 //
 
 #include "framework.h"
@@ -758,10 +758,10 @@ BOOL isUrlSchemeReged() {
 	}
 	if (status == ERROR_SUCCESS) {
 		DWORD dataSize = 0;
-		status = RegQueryValueExW(hKey, NULL, NULL, NULL, NULL, &dataSize);
+		status = RegGetValueW(hKey, NULL, NULL, RRF_RT_REG_SZ, NULL, NULL, &dataSize);
 		if (status == ERROR_SUCCESS) {
-			wchar_t* valueData = new wchar_t[dataSize / sizeof(wchar_t)];
-			status = RegQueryValueEx(hKey, NULL, NULL, NULL, (BYTE*)valueData, &dataSize);
+			wchar_t* valueData = new wchar_t[dataSize / sizeof(wchar_t) + 1]{};
+			status = RegGetValueW(hKey, NULL, NULL, RRF_RT_REG_SZ, NULL, valueData, &dataSize);
 			if (status == ERROR_SUCCESS) {
 				WCHAR command[MAX_PATH + 8] = L"";
 				if (GetQuotedModulePath(command, ARRAYSIZE(command)) &&
@@ -864,11 +864,11 @@ BOOL isAutoStartupSet(const wchar_t* appName) {
 
 	if (status == ERROR_SUCCESS) {
 		DWORD dataSize = 0;
-		status = RegQueryValueExW(hKey, appName, NULL, NULL, NULL, &dataSize);
+		status = RegGetValueW(hKey, NULL, appName, RRF_RT_REG_SZ, NULL, NULL, &dataSize);
 		if (status == ERROR_SUCCESS) {
-			wchar_t* valueData = new wchar_t[dataSize / sizeof(wchar_t)];
+			wchar_t* valueData = new wchar_t[dataSize / sizeof(wchar_t) + 1]{};
 
-			status = RegQueryValueEx(hKey, appName, NULL, NULL, (BYTE*)valueData, &dataSize);
+			status = RegGetValueW(hKey, NULL, appName, RRF_RT_REG_SZ, NULL, valueData, &dataSize);
 
 			if (status == ERROR_SUCCESS) {
 				WCHAR quotedPath[MAX_PATH + 4] = L"";
@@ -880,8 +880,8 @@ BOOL isAutoStartupSet(const wchar_t* appName) {
 				Log::Error(L"Failed to get the auto-run data from registry\n");
 			}
 			delete[] valueData;
-			RegCloseKey(hKey);
 		}
+		RegCloseKey(hKey);
 	}
 	return result;
 }
