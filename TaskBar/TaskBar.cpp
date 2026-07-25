@@ -437,6 +437,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	}
 	ExecCmdline();
 	Log::Info(L"Aria2 is starting...\n");
+	Log::Info(L"Disable the log window by starting with --disable-log-window argument.\n");
 	ShowTrayIcon(NIM_ADD);
 
 	RegisterApplicationRestart(NULL, RESTART_NO_CRASH | RESTART_NO_HANG);
