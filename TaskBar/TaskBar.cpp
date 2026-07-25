@@ -1,4 +1,4 @@
-// TaskBar.cpp : 定义应用程序的入口点。
+﻿// TaskBar.cpp : 定义应用程序的入口点。
 //
 
 #include "framework.h"
@@ -59,42 +59,6 @@ static BOOL GetQuotedModulePath(WCHAR* out, size_t cchOut) {
 		return FALSE;
 	return SUCCEEDED(StringCchPrintfW(out, cchOut, L"\"%s\"", self));
 }
-
-
-static DWORD MyGetProcessId(HANDLE hProcess) {
-	// https://gist.github.com/kusma/268888
-	typedef DWORD(WINAPI* pfnGPI)(HANDLE);
-	typedef ULONG(WINAPI* pfnNTQIP)(HANDLE, ULONG, PVOID, ULONG, PULONG);
-
-	static int first = 1;
-	static pfnGPI pfnGetProcessId;
-	static pfnNTQIP ZwQueryInformationProcess;
-	if (first) {
-		first = 0;
-		pfnGetProcessId = (pfnGPI)GetProcAddress(
-			GetModuleHandleW(L"KERNEL32.DLL"), "GetProcessId");
-		if (!pfnGetProcessId)
-			ZwQueryInformationProcess = (pfnNTQIP)GetProcAddress(
-				GetModuleHandleW(L"NTDLL.DLL"),
-				"ZwQueryInformationProcess");
-	}
-	if (pfnGetProcessId)
-		return pfnGetProcessId(hProcess);
-	if (ZwQueryInformationProcess) {
-		struct
-		{
-			PVOID Reserved1;
-			PVOID PebBaseAddress;
-			PVOID Reserved2[2];
-			ULONG UniqueProcessId;
-			PVOID Reserved3;
-		} pbi;
-		ZwQueryInformationProcess(hProcess, 0, &pbi, sizeof(pbi), 0);
-		return pbi.UniqueProcessId;
-	}
-	return 0;
-}
-
 
 static BOOL MyEndTask(DWORD pid) {
 	BOOL ret = TRUE;
@@ -303,7 +267,7 @@ BOOL ExecCmdline() {
 	}
 	BOOL bRet = CreateProcess(NULL, szCommandLine, NULL, NULL, FALSE, creationFlags, NULL, NULL, &si, &pi);
 	if (bRet) {
-		dwChildrenPid = MyGetProcessId(pi.hProcess);
+		dwChildrenPid = pi.dwProcessId;
 	}
 	else {
 		Log::Error(L"Execute \"%s\" failed!\n", szCommandLine);
