@@ -46,6 +46,21 @@ volatile DWORD dwChildrenPid;
 BOOL gDisableLogWindow = FALSE;
 
 
+// Write the *quoted* full path to this executable into `out`, e.g.  "C:\Program Files\App\Aria2Manager.exe"
+// The quotes are required so a path that contains spaces (e.g. anywhere under
+// "C:\Program Files\") survives the shell / CreateProcess argument-splitting rules. It is
+// used both for the aria2:// shell\open\command value and for the Run-key autostart value.
+// An unquoted path silently breaks the "Launch Aria2" / "Open Downloaded File" actions and
+// is also the classic unquoted-path prefix-hijack (a rogue C:\Program.exe would run first).
+static BOOL GetQuotedModulePath(WCHAR* out, size_t cchOut) {
+	WCHAR self[MAX_PATH];
+	DWORD len = GetModuleFileNameW(NULL, self, ARRAYSIZE(self));
+	if (len == 0 || len >= ARRAYSIZE(self)) // API failure, or path longer than the buffer (truncated)
+		return FALSE;
+	return SUCCEEDED(StringCchPrintfW(out, cchOut, L"\"%s\"", self));
+}
+
+
 static DWORD MyGetProcessId(HANDLE hProcess) {
 	// https://gist.github.com/kusma/268888
 	typedef DWORD(WINAPI* pfnGPI)(HANDLE);
@@ -702,10 +717,14 @@ BOOL RegUrlScheme() {
 		return false;
 	}
 
-	// 设置Command值
-	WCHAR command[MAX_PATH] = L"";
-	GetModuleFileName(NULL, command, sizeof(command) / sizeof(command[0]) - 1);
-	StringCchCatW(command, sizeof(command) / sizeof(command[0]) - 1, L" %1");
+	// 设置Command值:  "<module path>" "%1"  (both quoted so paths containing spaces work)
+	WCHAR command[MAX_PATH + 8] = L"";
+	if (!GetQuotedModulePath(command, ARRAYSIZE(command)) ||
+		FAILED(StringCchCatW(command, ARRAYSIZE(command), L" \"%1\""))) {
+		RegCloseKey(hKeyCommand);
+		RegCloseKey(hKey);
+		return false;
+	}
 	status = RegSetValueExW(hKeyCommand, nullptr, 0, REG_SZ, reinterpret_cast<const BYTE*>(command), (lstrlen(command) + 1) * sizeof(WCHAR));
 	if (status != ERROR_SUCCESS) {
 		// 错误处理
@@ -744,10 +763,11 @@ BOOL isUrlSchemeReged() {
 			wchar_t* valueData = new wchar_t[dataSize / sizeof(wchar_t)];
 			status = RegQueryValueEx(hKey, NULL, NULL, NULL, (BYTE*)valueData, &dataSize);
 			if (status == ERROR_SUCCESS) {
-				WCHAR command[MAX_PATH] = L"";
-				GetModuleFileName(NULL, command, sizeof(command) / sizeof(command[0]) - 1);
-				StringCchCatW(command, sizeof(command) / sizeof(command[0]) - 1, L" %1");
-				result = wcscmp(valueData, command) == 0;
+				WCHAR command[MAX_PATH + 8] = L"";
+				if (GetQuotedModulePath(command, ARRAYSIZE(command)) &&
+					SUCCEEDED(StringCchCatW(command, ARRAYSIZE(command), L" \"%1\""))) {
+					result = wcscmp(valueData, command) == 0;
+				}
 			}
 			delete[] valueData;
 		}
@@ -768,13 +788,18 @@ BOOL enableAutoStartup(const wchar_t* appName) {
 		&hKey
 	);
 	if (status == ERROR_SUCCESS) {
+		WCHAR quotedPath[MAX_PATH + 4] = L"";
+		if (!GetQuotedModulePath(quotedPath, ARRAYSIZE(quotedPath))) {
+			RegCloseKey(hKey);
+			return false;
+		}
 		status = RegSetValueEx(
 			hKey,
 			appName,
 			0,
 			REG_SZ,
-			(BYTE*)szFullPath,
-			(wcslen(szFullPath) + 1) * sizeof(wchar_t)
+			(BYTE*)quotedPath,
+			(wcslen(quotedPath) + 1) * sizeof(wchar_t)
 		);
 
 		if (status == ERROR_SUCCESS) {
@@ -846,7 +871,10 @@ BOOL isAutoStartupSet(const wchar_t* appName) {
 			status = RegQueryValueEx(hKey, appName, NULL, NULL, (BYTE*)valueData, &dataSize);
 
 			if (status == ERROR_SUCCESS) {
-				result = wcscmp(valueData, szFullPath) == 0;
+				WCHAR quotedPath[MAX_PATH + 4] = L"";
+				if (GetQuotedModulePath(quotedPath, ARRAYSIZE(quotedPath))) {
+					result = wcscmp(valueData, quotedPath) == 0;
+				}
 			}
 			else {
 				Log::Error(L"Failed to get the auto-run data from registry\n");
